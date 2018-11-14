@@ -11,7 +11,7 @@ RUN curl -sL https://deb.nodesource.com/setup_10.x | bash -
 RUN apt-get install -y git python python-setuptools python-pip nodejs \
   && rm -rf /var/lib/apt/lists/* \
   && pip install wheel
-
+RUN apt-get install -y npm
 RUN npm install -g yarn
 
 
