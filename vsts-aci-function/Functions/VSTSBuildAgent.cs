@@ -1,16 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Microsoft.Azure.Management.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
-using Microsoft.Azure.Management.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
-using System.Configuration;
-using System.Collections.Generic;
 
 namespace Functions
 {
@@ -21,14 +21,15 @@ namespace Functions
         [FunctionName("StartVSTSBuildAgent")]
         public static async Task<HttpResponseMessage> StartVSTSBuildAgenttAsync([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)]HttpRequestMessage req, TraceWriter log)
         {
-            var resourceGroup = await _azure.ResourceGroups.GetByNameAsync("vsts");
+            var resourceGroupName = ConfigurationManager.AppSettings["ResourceGroupName"];
+            var resourceGroup = await _azure.ResourceGroups.GetByNameAsync(resourceGroupName);
             var agentName = await GetNameAsync(req, "name");
             var env = new Dictionary<string, string>
             {
                 { "VSTS_AGENT_INPUT_URL", ConfigurationManager.AppSettings["VSTS_AGENT_INPUT_URL"] },
                 { "VSTS_AGENT_INPUT_AUTH", "pat" },
                 { "VSTS_AGENT_INPUT_TOKEN", ConfigurationManager.AppSettings["VSTS_AGENT_INPUT_TOKEN"] },
-                { "VSTS_AGENT_INPUT_POOL", "AzureContainerInstance" },
+                { "VSTS_AGENT_INPUT_POOL", ConfigurationManager.AppSettings["VSTS_AGENT_INPUT_POOL"] },
                 { "VSTS_AGENT_INPUT_AGENT", agentName }
             };
 
@@ -36,10 +37,10 @@ namespace Functions
                 .WithRegion(resourceGroup.RegionName)
                 .WithExistingResourceGroup(resourceGroup)
                 .WithLinux()
-                .WithPublicImageRegistryOnly()
+                .WithPrivateImageRegistry(ConfigurationManager.AppSettings["RegistryUrl"], ConfigurationManager.AppSettings["RegistryUser"], ConfigurationManager.AppSettings["RegistryPassword"])
                 .WithoutVolume()
                 .DefineContainerInstance(agentName)
-                    .WithImage("acanthamoeba/vsts-build-agent")
+                    .WithImage(ConfigurationManager.AppSettings["BuildServerImage"])
                     .WithoutPorts()
                     .WithEnvironmentVariables(env)
                     .Attach()
