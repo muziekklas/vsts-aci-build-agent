@@ -328,5 +328,3 @@ ASALocalRun/
 # MFractors (Xamarin productivity tool) working folder 
 .mfractor/
 /vsts-aci-function/Functions/App.Release.config
-/vsts-aci-function/Functions/local.settings.json
-/

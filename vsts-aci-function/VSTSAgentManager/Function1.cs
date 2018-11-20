@@ -1,4 +1,5 @@
 using System;
+
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
@@ -45,6 +46,7 @@ namespace VSTSAgentManager
                         .WithImage(ConfigurationManager.AppSettings["BuildServerImage"])
                         .WithExternalTcpPorts(443, 80)
                         .WithCpuCoreCount(2)
+                        .WithMemorySizeInGB(3.5)
                         .WithEnvironmentVariables(env)
                         .Attach()
                     .CreateAsync();
