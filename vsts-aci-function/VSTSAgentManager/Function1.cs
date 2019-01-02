@@ -36,53 +36,49 @@ namespace VSTSAgentManager
         [FunctionName("StartVSTSBuildAgent")]
         public static async Task<HttpResponseMessage> StartVSTSBuildAgenttAsync([HttpTrigger(AuthorizationLevel.Function, "post", Route = null)]HttpRequestMessage req, TraceWriter log)
         {
-            var _azure = GetAzure();
             var body = await GetBody(req);
-            using (var vstsConnection = VstsConnection.GetConnection(body))
-            {
-                // vstsConnection.HttpClient.RaisePlanEventAsync(vstsConnection.ProjectId, "build", )
-                var resourceGroupName = ConfigurationManager.AppSettings["ResourceGroupName"];
-                var resourceGroup = await _azure.ResourceGroups.GetByNameAsync(resourceGroupName);
-                var env = new Dictionary<string, string>
+            Task.Factory.StartNew(() => _StartVSTSBuildAgenttAsync(body, log)); // No await 
+
+            return req.CreateResponse(HttpStatusCode.Created, "VSTS agent is starting...");
+        }
+        private static async Task _StartVSTSBuildAgenttAsync(RequestBody body, TraceWriter log)
+        {
+            var _azure = GetAzure();
+
+            // vstsConnection.HttpClient.RaisePlanEventAsync(vstsConnection.ProjectId, "build", )
+            var resourceGroupName = ConfigurationManager.AppSettings["ResourceGroupName"];
+            var resourceGroup = await _azure.ResourceGroups.GetByNameAsync(resourceGroupName);
+            var env = new Dictionary<string, string>
                  {
                     { "VSTS_ACCOUNT", ConfigurationManager.AppSettings["VSTS_AGENT_INPUT_URL"] },
                     { "VSTS_TOKEN", ConfigurationManager.AppSettings["VSTS_AGENT_INPUT_TOKEN"] },
                     { "VSTS_POOL", ConfigurationManager.AppSettings["VSTS_AGENT_INPUT_POOL"] },
                     { "VSTS_AGENT", body.Name }
                 };
-                await vstsConnection.WriteLogItem("Gathered information to scaffold agent");
-                try
-                {
-                    await vstsConnection.WriteLogItem("Building agent...");
-                    var containerGroup = await _azure.ContainerGroups.Define(body.Name)
-                        .WithRegion(resourceGroup.RegionName)
-                        .WithExistingResourceGroup(resourceGroup)
-                        .WithLinux()
-                        .WithPrivateImageRegistry(
-                            ConfigurationManager.AppSettings["RegistryUrl"],
-                            ConfigurationManager.AppSettings["RegistryUser"],
-                            ConfigurationManager.AppSettings["RegistryPassword"])
-                        .WithoutVolume()
-                        .DefineContainerInstance(body.Name)
-                            .WithImage(ConfigurationManager.AppSettings["BuildServerImagePrefix"] + $"/{body.ProjectType}")
-                            .WithExternalTcpPorts(443, 80)
-                            .WithCpuCoreCount(2)
-                            .WithMemorySizeInGB(3.5)
-                            .WithEnvironmentVariables(env)
-                            .Attach()
-                        .CreateAsync();
-                    await vstsConnection.WriteLogItem("Building agent finished!");
-                    await vstsConnection.RaiseCompletion();
-                    return req.CreateResponse(HttpStatusCode.OK, "VSTS agent is running");
-                }
-
-                catch (Exception ex)
-                {
-                    log.Error("Failed to create", ex);
-                    await vstsConnection.WriteLogItem("Failed to build agent!");
-                    await vstsConnection.RaiseCompletion(TaskResult.Failed);
-                    throw;
-                }
+            try
+            {
+                var containerGroup = await _azure.ContainerGroups.Define(body.Name)
+                    .WithRegion(resourceGroup.RegionName)
+                    .WithExistingResourceGroup(resourceGroup)
+                    .WithLinux()
+                    .WithPrivateImageRegistry(
+                        ConfigurationManager.AppSettings["RegistryUrl"],
+                        ConfigurationManager.AppSettings["RegistryUser"],
+                        ConfigurationManager.AppSettings["RegistryPassword"])
+                    .WithoutVolume()
+                    .DefineContainerInstance(body.Name)
+                        .WithImage(ConfigurationManager.AppSettings["BuildServerImagePrefix"] + $"/{body.ProjectType}")
+                        .WithExternalTcpPorts(443, 80)
+                        .WithCpuCoreCount(2)
+                        .WithMemorySizeInGB(3.5)
+                        .WithEnvironmentVariables(env)
+                        .Attach()
+                    .CreateAsync();
+            }
+            catch (Exception ex)
+            {
+                log.Error("Failed to create", ex);
+                throw;
             }
         }
 
